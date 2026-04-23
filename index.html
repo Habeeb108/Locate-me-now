@@ -4,8 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Locate Me Now</title>
-
-  <!-- These two lines connect the PWA files we just created -->
   <link rel="manifest" href="manifest.json" />
   <meta name="theme-color" content="#e53935" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -49,11 +47,21 @@
       color: #666;
     }
 
-    /* Bigger inputs for easier mobile tapping */
+    /* Contact block wraps each email field + label */
+    .contact-block {
+      margin-bottom: 12px;
+      text-align: left;
+    }
+
+    .field-label {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 4px;
+    }
+
     input, textarea {
       width: 100%;
       padding: 14px;
-      margin-bottom: 16px;
       border: 1px solid #ddd;
       border-radius: 8px;
       font-size: 16px;
@@ -62,27 +70,40 @@
     textarea {
       height: 90px;
       resize: none;
+      margin-top: 12px;
     }
 
-    /* Small label above the email field */
-    .field-label {
-      text-align: left;
-      font-size: 12px;
-      color: #888;
-      margin-bottom: 4px;
+    /* The "+ Add contact" button */
+    #add-contact-btn {
+      background: none;
+      border: 1px dashed #ccc;
+      color: #e53935;
+      font-size: 14px;
+      font-weight: bold;
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-bottom: 16px;
     }
 
-    /* The saved email notice */
-    #saved-notice {
-      font-size: 12px;
+    #add-contact-btn:hover {
+      background-color: #fff5f5;
+    }
+
+    /* Hidden contact fields start invisible */
+    .contact-block.hidden {
+      display: none;
+    }
+
+    /* Saved notice under contact fields */
+    .saved-notice {
+      font-size: 11px;
       color: #2e7d32;
-      text-align: left;
-      margin-top: -10px;
-      margin-bottom: 12px;
-      min-height: 16px;
+      margin-top: 2px;
+      min-height: 14px;
     }
 
-    /* Normal red HELP button */
     #help-button {
       width: 100%;
       padding: 22px;
@@ -95,7 +116,6 @@
       letter-spacing: 4px;
       cursor: pointer;
       margin-top: 8px;
-      /* Smooth color transitions */
       transition: background-color 0.2s;
     }
 
@@ -103,20 +123,17 @@
       background-color: #c62828;
     }
 
-    /* Button turns orange during countdown */
     #help-button.counting {
       background-color: #e65100;
       font-size: 24px;
       letter-spacing: 2px;
     }
 
-    /* Button turns gray when disabled */
     #help-button:disabled {
       background-color: #aaa;
       cursor: not-allowed;
     }
 
-    /* Cancel button — only shows during countdown */
     #cancel-button {
       display: none;
       width: 100%;
@@ -150,60 +167,97 @@
 <body>
 
   <div class="card">
-    <h1>🚨 Emergency Help</h1>
-    <p class="subtitle">Press the button to send your location to your emergency contact.</p>
+    <h1>🚨 Locate Me Now</h1>
+    <p class="subtitle">Press the button to send your location to your emergency contacts.</p>
 
-    <div class="field-label">Emergency contact email</div>
-    <input
-      type="email"
-      id="contact-email"
-      placeholder="example@gmail.com"
-    />
+    <!-- Contact 1 — always visible -->
+    <div class="contact-block" id="block-1">
+      <div class="field-label">Emergency contact 1</div>
+      <input type="email" id="email-1" placeholder="example@gmail.com" />
+      <div class="saved-notice" id="notice-1"></div>
+    </div>
 
-    <!-- This line appears when a saved email is loaded -->
-    <div id="saved-notice"></div>
+    <!-- Contact 2 — hidden until + button clicked -->
+    <div class="contact-block hidden" id="block-2">
+      <div class="field-label">Emergency contact 2</div>
+      <input type="email" id="email-2" placeholder="example@gmail.com" />
+      <div class="saved-notice" id="notice-2"></div>
+    </div>
 
-    <div class="field-label">Optional message</div>
-    <textarea
-      id="custom-message"
-      placeholder="e.g. I need help, call me"
-    ></textarea>
+    <!-- Contact 3 — hidden until + button clicked twice -->
+    <div class="contact-block hidden" id="block-3">
+      <div class="field-label">Emergency contact 3</div>
+      <input type="email" id="email-3" placeholder="example@gmail.com" />
+      <div class="saved-notice" id="notice-3"></div>
+    </div>
+
+    <!-- Add contact button -->
+    <button id="add-contact-btn">+ Add contact</button>
+
+    <!-- Optional message -->
+    <div class="field-label" style="text-align:left">Optional message</div>
+    <textarea id="custom-message" placeholder="e.g. I need help, call me"></textarea>
 
     <button id="help-button">HELP</button>
-
-    <!-- This button only appears during the countdown -->
     <button id="cancel-button">Cancel</button>
 
     <div id="status"></div>
   </div>
 
   <script>
+
     // ---- SETUP ----
     emailjs.init("aZEr1eChgvhy5PCAh");
-
-    // This will hold our countdown timer so we can cancel it
     var countdownTimer = null;
 
-    // ---- FEATURE 1: LOAD SAVED EMAIL ----
-    // When the page loads, check if we saved an email before
-    // localStorage is like a tiny notebook in the browser
-    var savedEmail = localStorage.getItem("emergencyContact");
-    if (savedEmail) {
-      document.getElementById("contact-email").value = savedEmail;
-      document.getElementById("saved-notice").textContent = "✔ Contact loaded from last time";
+    // ---- LOAD SAVED EMAILS ----
+    // Check localStorage for each contact slot
+    for (var i = 1; i <= 3; i++) {
+      var saved = localStorage.getItem("emergencyContact" + i);
+      if (saved) {
+        document.getElementById("email-" + i).value = saved;
+        document.getElementById("notice-" + i).textContent = "✔ Saved from last time";
+        // If contact 2 or 3 has a saved email, show that block automatically
+        if (i > 1) {
+          document.getElementById("block-" + i).classList.remove("hidden");
+        }
+      }
     }
 
-    // ---- BUTTON REFERENCES ----
+    // ---- TRACK HOW MANY CONTACTS ARE VISIBLE ----
+    // Start at 1 (first block always visible)
+    // But if saved emails revealed block 2 or 3, count those too
+    var visibleContacts = 1;
+    if (!document.getElementById("block-2").classList.contains("hidden")) visibleContacts = 2;
+    if (!document.getElementById("block-3").classList.contains("hidden")) visibleContacts = 3;
+
+    // Hide the + button if all 3 are already visible
+    if (visibleContacts === 3) {
+      document.getElementById("add-contact-btn").style.display = "none";
+    }
+
+    // ---- ADD CONTACT BUTTON ----
+    document.getElementById("add-contact-btn").addEventListener("click", function() {
+      visibleContacts++;
+      // Show the next contact block
+      document.getElementById("block-" + visibleContacts).classList.remove("hidden");
+      // Focus the new field so keyboard opens on mobile
+      document.getElementById("email-" + visibleContacts).focus();
+      // Hide the + button once all 3 are visible
+      if (visibleContacts === 3) {
+        document.getElementById("add-contact-btn").style.display = "none";
+      }
+    });
+
+    // ---- CANCEL BUTTON ----
     var helpBtn   = document.getElementById("help-button");
     var cancelBtn = document.getElementById("cancel-button");
 
-    // ---- CANCEL BUTTON ----
-    // If the user clicks Cancel during countdown, stop everything
     cancelBtn.addEventListener("click", function() {
-      clearTimeout(countdownTimer);  // Stop the countdown timer
-      helpBtn.textContent    = "HELP";
-      helpBtn.className      = "";
-      helpBtn.disabled       = false;
+      clearTimeout(countdownTimer);
+      helpBtn.textContent     = "HELP";
+      helpBtn.className       = "";
+      helpBtn.disabled        = false;
       cancelBtn.style.display = "none";
       showStatus("Cancelled. You're safe.", "info");
     });
@@ -211,89 +265,93 @@
     // ---- HELP BUTTON ----
     helpBtn.addEventListener("click", function() {
 
-      var contactEmail  = document.getElementById("contact-email").value;
-      var customMessage = document.getElementById("custom-message").value || "No message provided";
+      // Collect all filled email addresses
+      var contacts = [];
+      for (var i = 1; i <= 3; i++) {
+        var val = document.getElementById("email-" + i).value.trim();
+        if (val) contacts.push(val);
+      }
 
-      // Make sure there's an email entered
-      if (!contactEmail) {
-        showStatus("Please enter an emergency contact email first.", "error");
+      // Make sure at least one contact is entered
+      if (contacts.length === 0) {
+        showStatus("Please enter at least one emergency contact email.", "error");
         return;
       }
 
-      // ---- FEATURE 1: SAVE THE EMAIL ----
-      // Every time they click HELP, save the email to localStorage
-      // So next time they open the app, it's already there
-      localStorage.setItem("emergencyContact", contactEmail);
-      document.getElementById("saved-notice").textContent = "✔ Contact saved for next time";
+      var customMessage = document.getElementById("custom-message").value || "No message provided";
 
-      // ---- FEATURE 3: COUNTDOWN ----
-      // Count down 3... 2... 1... before actually sending
-      // This gives the user a chance to cancel if it was an accident
+      // Save all contacts to localStorage
+      for (var j = 1; j <= 3; j++) {
+        var email = document.getElementById("email-" + j).value.trim();
+        if (email) {
+          localStorage.setItem("emergencyContact" + j, email);
+          document.getElementById("notice-" + j).textContent = "✔ Saved for next time";
+        }
+      }
+
+      // ---- COUNTDOWN ----
       var count = 3;
-
-      // Show the cancel button
       cancelBtn.style.display = "block";
       helpBtn.className       = "counting";
-      helpBtn.disabled        = false; // Keep enabled so countdown shows
+      helpBtn.disabled        = false;
 
-      // This function runs every second
       function tick() {
         if (count === 0) {
-          // Countdown finished — now actually send the alert
           helpBtn.textContent     = "SENDING...";
           helpBtn.disabled        = true;
           cancelBtn.style.display = "none";
-          sendAlert(contactEmail, customMessage);
+          sendAlert(contacts, customMessage);
         } else {
-          // Show the current count on the button
           helpBtn.textContent = "Sending in " + count + "...";
           count--;
-          // Wait 1 second then run tick() again
           countdownTimer = setTimeout(tick, 1000);
         }
       }
 
-      // Start the countdown immediately
       tick();
     });
 
-    // ---- SEND THE ALERT ----
-    // This is the same logic as yesterday, pulled into its own function
-    function sendAlert(contactEmail, customMessage) {
+    // ---- SEND ALERT TO ALL CONTACTS ----
+    function sendAlert(contacts, customMessage) {
       showStatus("Getting your location...", "info");
 
       navigator.geolocation.getCurrentPosition(
 
-        // Location success
         function(position) {
           var lat     = position.coords.latitude;
           var lon     = position.coords.longitude;
           var mapLink = "https://www.google.com/maps?q=" + lat + "," + lon;
 
-          emailjs.send(
-            "service_1fzochs",
-            "template_2hh3ecn",
-            {
-              to_email      : contactEmail,
-              message       : customMessage,
-              location_link : mapLink
-            }
-          ).then(function() {
+          // Send email to each contact one by one
+          // Promise.all means "wait for ALL emails to finish"
+          var emailPromises = contacts.map(function(email) {
+            return emailjs.send(
+              "service_1fzochs",
+              "template_2hh3ecn",
+              {
+                to_email      : email,
+                message       : customMessage,
+                location_link : mapLink
+              }
+            );
+          });
+
+          // Wait for all emails to be sent
+          Promise.all(emailPromises).then(function() {
             helpBtn.textContent = "HELP";
             helpBtn.className   = "";
             helpBtn.disabled    = false;
-            showStatus("✅ Alert sent! Your contact has been notified with your location.", "success");
+            showStatus("✅ Alert sent to " + contacts.length + " contact(s)! They have your location.", "success");
 
           }).catch(function(error) {
             helpBtn.textContent = "HELP";
             helpBtn.className   = "";
             helpBtn.disabled    = false;
-            showStatus("❌ Failed to send email. Check your internet connection.", "error");
+            showStatus("❌ Failed to send. Check your internet connection.", "error");
             console.error("EmailJS error:", error);
           });
         },
 
-        // Location error
         function() {
           helpBtn.textContent = "HELP";
           helpBtn.className   = "";
@@ -302,15 +360,17 @@
         }
       );
     }
-// Register the service worker (makes app installable)
-if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/Locate-me-now/sw.js");
-    }
-    // ---- HELPER: SHOW STATUS MESSAGES ----
+
+    // ---- HELPER ----
     function showStatus(message, type) {
-      var el       = document.getElementById("status");
+      var el         = document.getElementById("status");
       el.textContent = message;
       el.className   = type;
+    }
+
+    // ---- SERVICE WORKER ----
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/Locate-me-now/sw.js");
     }
 
   </script>
