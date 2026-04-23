@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Emergency Help</title>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <style>
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      background-color: #1a1a1a;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .card {
+      background-color: #ffffff;
+      border-radius: 16px;
+      padding: 40px 32px;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+    }
+
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 22px;
+      color: #1a1a1a;
+    }
+
+    p.subtitle {
+      margin: 0 0 28px 0;
+      font-size: 14px;
+      color: #666;
+    }
+
+    /* Bigger inputs for easier mobile tapping */
+    input, textarea {
+      width: 100%;
+      padding: 14px;
+      margin-bottom: 16px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+
+    textarea {
+      height: 90px;
+      resize: none;
+    }
+
+    /* Small label above the email field */
+    .field-label {
+      text-align: left;
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 4px;
+    }
+
+    /* The saved email notice */
+    #saved-notice {
+      font-size: 12px;
+      color: #2e7d32;
+      text-align: left;
+      margin-top: -10px;
+      margin-bottom: 12px;
+      min-height: 16px;
+    }
+
+    /* Normal red HELP button */
+    #help-button {
+      width: 100%;
+      padding: 22px;
+      background-color: #e53935;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 32px;
+      font-weight: bold;
+      letter-spacing: 4px;
+      cursor: pointer;
+      margin-top: 8px;
+      /* Smooth color transitions */
+      transition: background-color 0.2s;
+    }
+
+    #help-button:hover {
+      background-color: #c62828;
+    }
+
+    /* Button turns orange during countdown */
+    #help-button.counting {
+      background-color: #e65100;
+      font-size: 24px;
+      letter-spacing: 2px;
+    }
+
+    /* Button turns gray when disabled */
+    #help-button:disabled {
+      background-color: #aaa;
+      cursor: not-allowed;
+    }
+
+    /* Cancel button — only shows during countdown */
+    #cancel-button {
+      display: none;
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      background-color: transparent;
+      color: #888;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    #cancel-button:hover {
+      background-color: #f5f5f5;
+    }
+
+    #status {
+      margin-top: 20px;
+      font-size: 14px;
+      min-height: 20px;
+      color: #333;
+    }
+
+    .success { color: #2e7d32; font-weight: bold; }
+    .error   { color: #c62828; font-weight: bold; }
+    .info    { color: #555; }
+
+  </style>
+</head>
+<body>
+
+  <div class="card">
+    <h1>🚨 Emergency Help</h1>
+    <p class="subtitle">Press the button to send your location to your emergency contact.</p>
+
+    <div class="field-label">Emergency contact email</div>
+    <input
+      type="email"
+      id="contact-email"
+      placeholder="example@gmail.com"
+    />
+
+    <!-- This line appears when a saved email is loaded -->
+    <div id="saved-notice"></div>
+
+    <div class="field-label">Optional message</div>
+    <textarea
+      id="custom-message"
+      placeholder="e.g. I need help, call me"
+    ></textarea>
+
+    <button id="help-button">HELP</button>
+
+    <!-- This button only appears during the countdown -->
+    <button id="cancel-button">Cancel</button>
+
+    <div id="status"></div>
+  </div>
+
+  <script>
+    // ---- SETUP ----
+    emailjs.init("aZEr1eChgvhy5PCAh");
+
+    // This will hold our countdown timer so we can cancel it
+    var countdownTimer = null;
+
+    // ---- FEATURE 1: LOAD SAVED EMAIL ----
+    // When the page loads, check if we saved an email before
+    // localStorage is like a tiny notebook in the browser
+    var savedEmail = localStorage.getItem("emergencyContact");
+    if (savedEmail) {
+      document.getElementById("contact-email").value = savedEmail;
+      document.getElementById("saved-notice").textContent = "✔ Contact loaded from last time";
+    }
+
+    // ---- BUTTON REFERENCES ----
+    var helpBtn   = document.getElementById("help-button");
+    var cancelBtn = document.getElementById("cancel-button");
+
+    // ---- CANCEL BUTTON ----
+    // If the user clicks Cancel during countdown, stop everything
+    cancelBtn.addEventListener("click", function() {
+      clearTimeout(countdownTimer);  // Stop the countdown timer
+      helpBtn.textContent    = "HELP";
+      helpBtn.className      = "";
+      helpBtn.disabled       = false;
+      cancelBtn.style.display = "none";
+      showStatus("Cancelled. You're safe.", "info");
+    });
+
+    // ---- HELP BUTTON ----
+    helpBtn.addEventListener("click", function() {
+
+      var contactEmail  = document.getElementById("contact-email").value;
+      var customMessage = document.getElementById("custom-message").value || "No message provided";
+
+      // Make sure there's an email entered
+      if (!contactEmail) {
+        showStatus("Please enter an emergency contact email first.", "error");
+        return;
+      }
+
+      // ---- FEATURE 1: SAVE THE EMAIL ----
+      // Every time they click HELP, save the email to localStorage
+      // So next time they open the app, it's already there
+      localStorage.setItem("emergencyContact", contactEmail);
+      document.getElementById("saved-notice").textContent = "✔ Contact saved for next time";
+
+      // ---- FEATURE 3: COUNTDOWN ----
+      // Count down 3... 2... 1... before actually sending
+      // This gives the user a chance to cancel if it was an accident
+      var count = 3;
+
+      // Show the cancel button
+      cancelBtn.style.display = "block";
+      helpBtn.className       = "counting";
+      helpBtn.disabled        = false; // Keep enabled so countdown shows
+
+      // This function runs every second
+      function tick() {
+        if (count === 0) {
+          // Countdown finished — now actually send the alert
+          helpBtn.textContent     = "SENDING...";
+          helpBtn.disabled        = true;
+          cancelBtn.style.display = "none";
+          sendAlert(contactEmail, customMessage);
+        } else {
+          // Show the current count on the button
+          helpBtn.textContent = "Sending in " + count + "...";
+          count--;
+          // Wait 1 second then run tick() again
+          countdownTimer = setTimeout(tick, 1000);
+        }
+      }
+
+      // Start the countdown immediately
+      tick();
+    });
+
+    // ---- SEND THE ALERT ----
+    // This is the same logic as yesterday, pulled into its own function
+    function sendAlert(contactEmail, customMessage) {
+      showStatus("Getting your location...", "info");
+
+      navigator.geolocation.getCurrentPosition(
+
+        // Location success
+        function(position) {
+          var lat     = position.coords.latitude;
+          var lon     = position.coords.longitude;
+          var mapLink = "https://www.google.com/maps?q=" + lat + "," + lon;
+
+          emailjs.send(
+            "service_1fzochs",
+            "template_2hh3ecn",
+            {
+              to_email      : contactEmail,
+              message       : customMessage,
+              location_link : mapLink
+            }
+          ).then(function() {
+            helpBtn.textContent = "HELP";
+            helpBtn.className   = "";
+            helpBtn.disabled    = false;
+            showStatus("✅ Alert sent! Your contact has been notified with your location.", "success");
+
+          }).catch(function(error) {
+            helpBtn.textContent = "HELP";
+            helpBtn.className   = "";
+            helpBtn.disabled    = false;
+            showStatus("❌ Failed to send email. Check your internet connection.", "error");
+            console.error("EmailJS error:", error);
+          });
+        },
+
+        // Location error
+        function() {
+          helpBtn.textContent = "HELP";
+          helpBtn.className   = "";
+          helpBtn.disabled    = false;
+          showStatus("❌ Could not get your location. Please allow location access.", "error");
+        }
+      );
+    }
+
+    // ---- HELPER: SHOW STATUS MESSAGES ----
+    function showStatus(message, type) {
+      var el       = document.getElementById("status");
+      el.textContent = message;
+      el.className   = type;
+    }
+
+  </script>
+
+</body>
+</html>
