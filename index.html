@@ -11,9 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <style>
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -47,7 +45,6 @@
       color: #666;
     }
 
-    /* Contact block wraps each email field + label */
     .contact-block {
       margin-bottom: 12px;
       text-align: left;
@@ -73,7 +70,6 @@
       margin-top: 12px;
     }
 
-    /* The "+ Add contact" button */
     #add-contact-btn {
       background: none;
       border: 1px dashed #ccc;
@@ -87,16 +83,10 @@
       margin-bottom: 16px;
     }
 
-    #add-contact-btn:hover {
-      background-color: #fff5f5;
-    }
+    #add-contact-btn:hover { background-color: #fff5f5; }
 
-    /* Hidden contact fields start invisible */
-    .contact-block.hidden {
-      display: none;
-    }
+    .contact-block.hidden { display: none; }
 
-    /* Saved notice under contact fields */
     .saved-notice {
       font-size: 11px;
       color: #2e7d32;
@@ -104,6 +94,7 @@
       min-height: 14px;
     }
 
+    /* HELP button */
     #help-button {
       width: 100%;
       padding: 22px;
@@ -119,9 +110,7 @@
       transition: background-color 0.2s;
     }
 
-    #help-button:hover {
-      background-color: #c62828;
-    }
+    #help-button:hover { background-color: #c62828; }
 
     #help-button.counting {
       background-color: #e65100;
@@ -132,6 +121,44 @@
     #help-button:disabled {
       background-color: #aaa;
       cursor: not-allowed;
+    }
+
+    /* Panic Mode button */
+    #panic-button {
+      width: 100%;
+      padding: 14px;
+      margin-top: 12px;
+      background-color: transparent;
+      color: #555;
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    #panic-button:hover {
+      background-color: #f5f5f5;
+    }
+
+    /* When panic mode is ON, button turns green */
+    #panic-button.active {
+      background-color: #2e7d32;
+      color: white;
+      border-color: #2e7d32;
+    }
+
+    /* Panic mode status bar — only shows when active */
+    #panic-status {
+      display: none;
+      margin-top: 10px;
+      padding: 10px;
+      background-color: #fff8e1;
+      border: 1px solid #ffe082;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #5d4037;
     }
 
     #cancel-button {
@@ -147,9 +174,7 @@
       cursor: pointer;
     }
 
-    #cancel-button:hover {
-      background-color: #f5f5f5;
-    }
+    #cancel-button:hover { background-color: #f5f5f5; }
 
     #status {
       margin-top: 20px;
@@ -170,35 +195,37 @@
     <h1>🚨 Locate Me Now</h1>
     <p class="subtitle">Press the button to send your location to your emergency contacts.</p>
 
-    <!-- Contact 1 — always visible -->
     <div class="contact-block" id="block-1">
       <div class="field-label">Emergency contact 1</div>
       <input type="email" id="email-1" placeholder="example@gmail.com" />
       <div class="saved-notice" id="notice-1"></div>
     </div>
 
-    <!-- Contact 2 — hidden until + button clicked -->
     <div class="contact-block hidden" id="block-2">
       <div class="field-label">Emergency contact 2</div>
       <input type="email" id="email-2" placeholder="example@gmail.com" />
       <div class="saved-notice" id="notice-2"></div>
     </div>
 
-    <!-- Contact 3 — hidden until + button clicked twice -->
     <div class="contact-block hidden" id="block-3">
       <div class="field-label">Emergency contact 3</div>
       <input type="email" id="email-3" placeholder="example@gmail.com" />
       <div class="saved-notice" id="notice-3"></div>
     </div>
 
-    <!-- Add contact button -->
     <button id="add-contact-btn">+ Add contact</button>
 
-    <!-- Optional message -->
     <div class="field-label" style="text-align:left">Optional message</div>
     <textarea id="custom-message" placeholder="e.g. I need help, call me"></textarea>
 
     <button id="help-button">HELP</button>
+
+    <!-- Panic Mode button -->
+    <button id="panic-button">🔴 Activate Panic Mode</button>
+
+    <!-- Shows when panic mode is running -->
+    <div id="panic-status"></div>
+
     <button id="cancel-button">Cancel</button>
 
     <div id="status"></div>
@@ -208,30 +235,26 @@
 
     // ---- SETUP ----
     emailjs.init("aZEr1eChgvhy5PCAh");
-    var countdownTimer = null;
+    var countdownTimer  = null;
+    var panicInterval   = null;  // This holds the panic mode repeating timer
+    var panicActive     = false; // Tracks if panic mode is on or off
+    var panicCount      = 0;     // Counts how many alerts have been sent
 
     // ---- LOAD SAVED EMAILS ----
-    // Check localStorage for each contact slot
     for (var i = 1; i <= 3; i++) {
       var saved = localStorage.getItem("emergencyContact" + i);
       if (saved) {
         document.getElementById("email-" + i).value = saved;
         document.getElementById("notice-" + i).textContent = "✔ Saved from last time";
-        // If contact 2 or 3 has a saved email, show that block automatically
         if (i > 1) {
           document.getElementById("block-" + i).classList.remove("hidden");
         }
       }
     }
 
-    // ---- TRACK HOW MANY CONTACTS ARE VISIBLE ----
-    // Start at 1 (first block always visible)
-    // But if saved emails revealed block 2 or 3, count those too
     var visibleContacts = 1;
     if (!document.getElementById("block-2").classList.contains("hidden")) visibleContacts = 2;
     if (!document.getElementById("block-3").classList.contains("hidden")) visibleContacts = 3;
-
-    // Hide the + button if all 3 are already visible
     if (visibleContacts === 3) {
       document.getElementById("add-contact-btn").style.display = "none";
     }
@@ -239,19 +262,18 @@
     // ---- ADD CONTACT BUTTON ----
     document.getElementById("add-contact-btn").addEventListener("click", function() {
       visibleContacts++;
-      // Show the next contact block
       document.getElementById("block-" + visibleContacts).classList.remove("hidden");
-      // Focus the new field so keyboard opens on mobile
       document.getElementById("email-" + visibleContacts).focus();
-      // Hide the + button once all 3 are visible
       if (visibleContacts === 3) {
         document.getElementById("add-contact-btn").style.display = "none";
       }
     });
 
     // ---- CANCEL BUTTON ----
-    var helpBtn   = document.getElementById("help-button");
-    var cancelBtn = document.getElementById("cancel-button");
+    var helpBtn    = document.getElementById("help-button");
+    var cancelBtn  = document.getElementById("cancel-button");
+    var panicBtn   = document.getElementById("panic-button");
+    var panicPanel = document.getElementById("panic-status");
 
     cancelBtn.addEventListener("click", function() {
       clearTimeout(countdownTimer);
@@ -262,17 +284,117 @@
       showStatus("Cancelled. You're safe.", "info");
     });
 
-    // ---- HELP BUTTON ----
-    helpBtn.addEventListener("click", function() {
+    // ---- PANIC MODE BUTTON ----
+    panicBtn.addEventListener("click", function() {
 
-      // Collect all filled email addresses
-      var contacts = [];
-      for (var i = 1; i <= 3; i++) {
-        var val = document.getElementById("email-" + i).value.trim();
-        if (val) contacts.push(val);
+      // If panic mode is already on, turn it OFF
+      if (panicActive) {
+        stopPanicMode();
+        return;
       }
 
-      // Make sure at least one contact is entered
+      // Make sure there's at least one contact
+      var contacts = getContacts();
+      if (contacts.length === 0) {
+        showStatus("Please enter at least one emergency contact email.", "error");
+        return;
+      }
+
+      // Turn panic mode ON
+      startPanicMode(contacts);
+    });
+
+    // ---- START PANIC MODE ----
+    function startPanicMode(contacts) {
+      panicActive = true;
+      panicCount  = 0;
+      var customMessage = document.getElementById("custom-message").value || "PANIC MODE ACTIVE";
+
+      // Update button appearance
+      panicBtn.textContent = "🟢 Panic Mode ON — tap to stop";
+      panicBtn.classList.add("active");
+
+      // Show the panic status panel
+      panicPanel.style.display = "block";
+      panicPanel.textContent   = "🚨 Panic mode active — sending location now...";
+
+      // Flash the page title so user knows it's running
+      // This alternates the tab title between two states
+      var titleFlash = setInterval(function() {
+        document.title = document.title === "🚨 PANIC MODE" ? "Locate Me Now" : "🚨 PANIC MODE";
+      }, 1000);
+
+      // Store the title flash interval so we can stop it later
+      window.titleFlashInterval = titleFlash;
+
+      // Send the first alert immediately
+      sendPanicAlert(contacts, customMessage);
+
+      // Then send every 2 minutes (120000 milliseconds = 2 minutes)
+      // setInterval means "repeat this every X milliseconds forever"
+      panicInterval = setInterval(function() {
+        sendPanicAlert(contacts, customMessage);
+      }, 120000);
+    }
+
+    // ---- STOP PANIC MODE ----
+    function stopPanicMode() {
+      panicActive = false;
+
+      // Stop the repeating timer
+      clearInterval(panicInterval);
+
+      // Stop the title flashing
+      clearInterval(window.titleFlashInterval);
+
+      // Reset everything
+      document.title           = "Locate Me Now";
+      panicBtn.textContent     = "🔴 Activate Panic Mode";
+      panicBtn.classList.remove("active");
+      panicPanel.style.display = "none";
+
+      showStatus("Panic mode stopped. Stay safe. 💙", "info");
+    }
+
+    // ---- SEND ONE PANIC ALERT ----
+    function sendPanicAlert(contacts, customMessage) {
+      panicCount++;
+
+      navigator.geolocation.getCurrentPosition(
+        function(position) {
+          var lat     = position.coords.latitude;
+          var lon     = position.coords.longitude;
+          var mapLink = "https://www.google.com/maps?q=" + lat + "," + lon;
+
+          // Send to all contacts
+          var emailPromises = contacts.map(function(email) {
+            return emailjs.send(
+              "service_1fzochs",
+              "template_2hh3ecn",
+              {
+                to_email      : email,
+                message       : "🚨 PANIC MODE — Alert #" + panicCount + ". " + customMessage,
+                location_link : mapLink
+              }
+            );
+          });
+
+          Promise.all(emailPromises).then(function() {
+            panicPanel.textContent = "🚨 Alert #" + panicCount + " sent to " + contacts.length + " contact(s). Next in 2 min.";
+          }).catch(function() {
+            panicPanel.textContent = "⚠️ Alert #" + panicCount + " failed to send. Will retry in 2 min.";
+          });
+        },
+        function() {
+          panicPanel.textContent = "⚠️ Could not get location for alert #" + panicCount + ". Will retry in 2 min.";
+        }
+      );
+    }
+
+    // ---- HELP BUTTON ----
+    helpBtn.addEventListener("click", function() {
+      var contacts = getContacts();
+
       if (contacts.length === 0) {
         showStatus("Please enter at least one emergency contact email.", "error");
         return;
@@ -280,7 +402,7 @@
 
       var customMessage = document.getElementById("custom-message").value || "No message provided";
 
-      // Save all contacts to localStorage
+      // Save contacts
       for (var j = 1; j <= 3; j++) {
         var email = document.getElementById("email-" + j).value.trim();
         if (email) {
@@ -289,7 +411,7 @@
         }
       }
 
-      // ---- COUNTDOWN ----
+      // Countdown
       var count = 3;
       cancelBtn.style.display = "block";
       helpBtn.className       = "counting";
@@ -311,19 +433,16 @@
       tick();
     });
 
-    // ---- SEND ALERT TO ALL CONTACTS ----
+    // ---- SEND ONE-TIME ALERT ----
     function sendAlert(contacts, customMessage) {
       showStatus("Getting your location...", "info");
 
       navigator.geolocation.getCurrentPosition(
-
         function(position) {
           var lat     = position.coords.latitude;
           var lon     = position.coords.longitude;
           var mapLink = "https://www.google.com/maps?q=" + lat + "," + lon;
 
-          // Send email to each contact one by one
-          // Promise.all means "wait for ALL emails to finish"
           var emailPromises = contacts.map(function(email) {
             return emailjs.send(
               "service_1fzochs",
@@ -336,13 +455,11 @@
             );
           });
 
-          // Wait for all emails to be sent
           Promise.all(emailPromises).then(function() {
             helpBtn.textContent = "HELP";
             helpBtn.className   = "";
             helpBtn.disabled    = false;
             showStatus("✅ Alert sent to " + contacts.length + " contact(s)! They have your location.", "success");
-
           }).catch(function(error) {
             helpBtn.textContent = "HELP";
             helpBtn.className   = "";
@@ -351,7 +468,6 @@
             console.error("EmailJS error:", error);
           });
         },
-
         function() {
           helpBtn.textContent = "HELP";
           helpBtn.className   = "";
@@ -361,7 +477,18 @@
       );
     }
 
-    // ---- HELPER ----
+    // ---- HELPER: GET ALL FILLED CONTACTS ----
+    // Reusable function that collects all non-empty email fields
+    function getContacts() {
+      var contacts = [];
+      for (var i = 1; i <= 3; i++) {
+        var val = document.getElementById("email-" + i).value.trim();
+        if (val) contacts.push(val);
+      }
+      return contacts;
+    }
+
+    // ---- HELPER: SHOW STATUS ----
     function showStatus(message, type) {
       var el         = document.getElementById("status");
       el.textContent = message;
