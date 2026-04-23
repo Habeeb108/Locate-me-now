@@ -3,7 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Emergency Help</title>
+  <title>Locate Me Now</title>
+
+  <!-- These two lines connect the PWA files we just created -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#e53935" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="LocateMe" />
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
   <style>
 
@@ -296,7 +302,10 @@
         }
       );
     }
-
+// Register the service worker (makes app installable)
+if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/Locate-me-now/sw.js");
+    }
     // ---- HELPER: SHOW STATUS MESSAGES ----
     function showStatus(message, type) {
       var el       = document.getElementById("status");
